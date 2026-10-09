@@ -6,7 +6,31 @@ on:
   workflow_dispatch:
 
 jobs:
+  lean:
+    name: Lean (CellLogic)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: lean
+      - name: Check axioms and sorry
+        working-directory: lean
+        run: |
+          lake env lean AxiomCheck.lean | tee axioms.txt
+          test -s axioms.txt
+          allowed='(propext|Classical\.choice|Quot\.sound)'
+          if grep -vE "(does not depend on any axioms|depends on axioms: \[${allowed}(, ${allowed})*\])$" axioms.txt; then
+            echo "::error::A theorem depends on sorry or a non-standard axiom."
+            exit 1
+          fi
+          if grep -rn --include='*.lean' -w sorry CellLogic; then
+            echo "::error::Found sorry."
+            exit 1
+          fi
+
   test:
+    name: Python
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

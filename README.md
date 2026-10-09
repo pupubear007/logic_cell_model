@@ -1,20 +1,55 @@
 # logic_cell_model
 
-Quantitative molecular and cellular models of plant–pathogen interactions, built topic by topic
-along the lines of *Quantitative Fundamentals of Molecular and Cellular Bioengineering*
-(Wittrup, Tidor, Hackel and Sarkar, MIT Press, 2020). Every model comes with the question of the
-logic paper,
-[*Deduction and Induction in One Diagram*](https://github.com/pupubear007/deductive-inductive-logic):
-**what can a measurement tell apart?**
-
-- *Deduction:* solve the model, from parameters to predicted measurements.
-- *Induction:* fit the model, from measurements back to parameters.
-- *Assay resolution (Theorem 8.2):* if two parameter sets give the same predicted
-  measurements, no amount of that data can tell them apart. In modelling this is called
-  identifiability. `cellmodels.identifiability` finds such cases and the combinations a design
-  leaves free.
+Cell and molecule models of plant–pathogen interactions, built on the logic of
+[*Deduction and Induction in One Diagram*](https://github.com/pupubear007/deductive-inductive-logic)
+and checked in Lean 4. The quantitative models follow the topics of *Quantitative Fundamentals of
+Molecular and Cellular Bioengineering* (Wittrup, Tidor, Hackel and Sarkar, MIT Press, 2020).
 
 Hsuan Fu Wang, Department of Plant Pathology, University of Minnesota.
+
+## The logic design, applied to cells
+
+| Paper | Cell model |
+|---|---|
+| world `w ∈ W` | a cell mechanism: rate constants, or a regulatory structure |
+| thought `φ : W → Prop` | a hypothesis about the cell ("turnover is fast", "the gene is host-responsive") |
+| deduction `φ ⊨ ψ` | the mechanism hypothesis predicts a measurement |
+| modus tollens (Prop 4.4) | a failed prediction eliminates the hypothesis |
+| study and support `s ⟳ t` (Def 3.4) | the data leave the hypothesis open |
+| assay `a : W → R` (Def 8.1) | an experimental design: mechanism ↦ what is measured |
+| resolution (Thm 8.2) | the experiment can decide the hypothesis: every possible result entails it or rules it out |
+| witness pair (Cor 8.3) | two mechanisms with the same data but different verdicts: no amount of this experiment decides the hypothesis |
+
+## Proved in Lean (`lean/CellLogic`)
+
+The Lean package depends on the paper's package `WangLogic` and uses its `Thought`, `Entails`,
+`Resolves` and `modus_tollens` directly. There is no `sorry`, and every theorem uses at most the
+axioms `propext`, `Classical.choice` and `Quot.sound` (`lean/AxiomCheck.lean`, checked in CI).
+
+| Experiment | Cannot decide | Theorem | Can decide | Theorem |
+|---|---|---|---|---|
+| RNA-seq snapshot at steady state | whether turnover is fast | `snapshot_not_resolves_fast` | snapshot + transcription shutoff: everything | `snapshotShutoff_resolves` |
+| expression on **one host** | fixed program vs host-responsive | `oneHost_not_resolves` | **two hosts** with different signals: everything | `twoHosts_resolves` |
+| a difference between two hosts | — | — | eliminates the fixed program (deduction + modus tollens) | `fixedProgram_predicts_equal`, `fixedProgram_refuted` |
+| enzyme rates at low substrate | the enzyme's affinity (Km) | `lowSubstrate_not_resolves` | rates at two substrate levels: everything | `twoSubstrates_resolves` |
+| bulk (population) expression | whether expression is bursty | `bulk_not_resolves` | single-cell mean + variance: everything | `singleCell_resolves` |
+
+Each non-resolution theorem exhibits an explicit witness pair. Each resolution theorem follows
+from injectivity of the experiment (`resolves_of_injective`).
+
+```sh
+cd lean
+lake exe cache get
+lake build
+lake env lean AxiomCheck.lean
+```
+
+## Computed in Python (`cellmodels`)
+
+The Python package solves and simulates the same models, and `cellmodels.logic` implements the
+paper's definitions (`entails`, `supported`, `resolves`, `witnesses`) for finite sets of worlds,
+so the reasoning runs on real data where the worlds are isolates, samples or candidate
+mechanisms. `tests/test_logic.py` checks each Lean theorem's statement on finite grids.
 
 ## Modules
 
@@ -26,6 +61,7 @@ Hsuan Fu Wang, Department of Plant Pathology, University of Minnesota.
 | `enzyme` | Michaelis–Menten rates, inhibition, integrated progress curves | secreted cell-wall-degrading enzymes |
 | `regulation` | Hill functions, host-regulated expression, negative autoregulation | fixed program vs host-responsive regulation |
 | `stochastic` | exact (Gillespie) simulation, constitutive and bursty expression, Fano factor | cell-to-cell variation; bulk vs single-cell data |
+| `logic` | the paper's definitions for finite sets of worlds | resolution on real isolates and samples |
 | `growth` | radial front, lag, logistic growth | radial growth, lesion expansion |
 | `transport` | diffusion with first-order reaction: penetration length, Thiele modulus | how far a secreted acid reaches into tissue |
 | `microfluidics` | Stokes (Poiseuille) flow, Reynolds, Péclet and Damköhler numbers, hydraulic resistance, wall shear stress | designing devices for spores, hyphae and roots |
